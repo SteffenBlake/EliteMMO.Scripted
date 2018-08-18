@@ -9218,6 +9218,11 @@
             {
                 var path = string.Format("{0}\\Nav\\", Application.StartupPath);
 
+                if (!Directory.Exists(path))
+                {
+                    Directory.CreateDirectory(path);
+                }
+
                 foreach (var file in Directory.GetFiles(path, "*.xin"))
                 {
                     selectedNavi.Items.Add(new FileInfo(file).Name);
@@ -9829,13 +9834,21 @@
             #region config: save/load (player)
         public void SaveFarmSettings()
         {
-            bool exists = System.IO.Directory.Exists(Application.StartupPath + @"\settings");
-            if (!exists) System.IO.Directory.CreateDirectory(Application.StartupPath + @"\settings");
-            var saveFile = new SaveFileDialog();
-            saveFile.Filter = @"settings file (*.xml)|*.xml";
-            saveFile.InitialDirectory = Application.StartupPath + @"\settings";
-            saveFile.FileName = JobNames[PlayerInfo.MainJob].Long.Replace(" ", "_") + "_"+ JobNames[PlayerInfo.SubJob].Long.Replace(" ", "_") + ".xml";
-            saveFile.Title = @"Save your settings file";
+            var settingsPath = Path.Combine(Application.StartupPath, "\\settings");
+            if (!Directory.Exists(settingsPath))
+            {
+                Directory.CreateDirectory(settingsPath);
+            }
+
+            var saveFile = new SaveFileDialog
+            {
+                Filter = @"settings file (*.xml)|*.xml",
+                InitialDirectory = Application.StartupPath + @"\settings",
+                FileName = JobNames[PlayerInfo.MainJob].Long.Replace(" ", "_") + "_" +
+                           JobNames[PlayerInfo.SubJob].Long.Replace(" ", "_") + ".xml",
+                Title = @"Save your settings file"
+            };
+
             switch (saveFile.ShowDialog())
             {
                 case DialogResult.OK:
@@ -9845,13 +9858,24 @@
         }
         public void LoadFarmSettings()
         {
+            var settingsPath = Path.Combine(Application.StartupPath, "\\settings");
+            if (!Directory.Exists(settingsPath))
+            {
+                Directory.CreateDirectory(settingsPath);
+            }
+
             isLoading = true;
             updatenav();
-            var openFile = new OpenFileDialog();
-            openFile.Filter = @"settings files (*.xml)|*.xml";
-            openFile.InitialDirectory = Application.StartupPath + @"\settings";
-            openFile.FileName = JobNames[PlayerInfo.MainJob].Long.Replace(" ", "_") + "_" + JobNames[PlayerInfo.SubJob].Long.Replace(" ", "_") + ".xml";
-            openFile.Title = @"Load your settings file";
+
+            var openFile = new OpenFileDialog
+            {
+                Filter = @"settings files (*.xml)|*.xml",
+                InitialDirectory = settingsPath,
+                Title = @"Load your settings file",
+                FileName = JobNames[PlayerInfo.MainJob].Long.Replace(" ", "_") + "_" +
+                           JobNames[PlayerInfo.SubJob].Long.Replace(" ", "_") + ".xml"
+            };
+
             switch (openFile.ShowDialog())
             {
                 case DialogResult.OK:
@@ -12362,25 +12386,7 @@
         #endregion
         #endregion
         #region Methods: NAV
-        public int FindClosestWayPoint()
-        {
-            var maxRange = 50.0;
-            var outRange = -1;
-            for (int i = 0; i < navPathX.Count(); i++)
-            {
-                var x = Math.Pow(PlayerInfo.X - navPathX[i], 2.0);
-                var z = Math.Pow(PlayerInfo.Z - navPathZ[i], 2.0);
-                var y = Math.Pow(PlayerInfo.Y - navPathY[i], 2.0);
-                var dist = (navPathY[i] == 0 ? Math.Sqrt(x + z) : Math.Sqrt(x + z + y));
-                if (dist < maxRange)
-                {
-                    maxRange = dist;
-                    outRange = i;
-                }
-            }
 
-            return outRange;
-        }
         public void CheckDoor(int navid)
         {
             var items = navPathdoor[navid].Split(';');
@@ -12646,23 +12652,46 @@
         private void updatenav()
         {
             selectedNavi.Items.Clear();
-            var path = string.Format("{0}\\Nav\\", Application.StartupPath);
-            foreach (var file in Directory.GetFiles(path, "*.xin"))
+
+            var navPath = Path.Combine(Application.StartupPath, "\\nav");
+            if (!Directory.Exists(navPath))
+            {
+                Directory.CreateDirectory(navPath);
+            }
+
+            foreach (var file in Directory.GetFiles(navPath, "*.xin"))
             {
                 if (!selectedNavi.Items.Contains(new FileInfo(file).Name)) selectedNavi.Items.Add(new FileInfo(file).Name);
             }
         }
         private void SelectedNaviSelectedIndexChanged(object sender, EventArgs e)
         {
-            if (selectedNavi.Text == "") return;
-            if (selectedNavi.Text.Contains("Linear")) Linear.Checked = true;
-            else if (selectedNavi.Text.Contains("Circular")) Circular.Checked = true;
-            var path = string.Format("{0}\\Nav\\", Application.StartupPath);
-            var navi = new FileInfo(path + selectedNavi.Text);
-
-            if (navi.Exists)
+            if (selectedNavi.Text == "")
             {
-                OpenNavi(navi.ToString());
+                return;
+            }
+            if (selectedNavi.Text.Contains("Linear"))
+            {
+                Linear.Checked = true;
+            }
+            else if (selectedNavi.Text.Contains("Circular"))
+            {
+                Circular.Checked = true;
+            }
+
+            var navPath = Path.Combine(Application.StartupPath, "\\nav");
+            if (!Directory.Exists(navPath))
+            {
+                Directory.CreateDirectory(navPath);
+            }
+
+            var naviPath = Path.Combine(navPath, selectedNavi.Text);
+
+            var naviFile = new FileInfo(naviPath);
+
+            if (naviFile.Exists)
+            {
+                OpenNavi(naviFile.ToString());
             }
         }
         private void RecordIdleLocation_Click(object sender, EventArgs e)

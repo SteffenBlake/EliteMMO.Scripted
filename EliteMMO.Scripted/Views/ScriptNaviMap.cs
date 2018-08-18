@@ -179,31 +179,47 @@
         }
         private void SaveToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            bool exists = System.IO.Directory.Exists(Application.StartupPath + @"\nav");
-            if (!exists) System.IO.Directory.CreateDirectory(Application.StartupPath + @"\nav");
-            var saveFile = new SaveFileDialog();
+            var navPath = Path.Combine(Application.StartupPath, "\\nav");
+            if (!Directory.Exists(navPath))
+            {
+                Directory.CreateDirectory(navPath);
+            }
+
+            var saveFile = new SaveFileDialog
+            {
+                InitialDirectory = navPath,
+                Title = @"Save your nav file"
+            };
+
             if (EnableForceSave.Checked)
             {
                 if (ForceCircular.Checked)
+                {
                     saveFile.Filter = @"nav file (*.xin)|*.Circular.xin";
+                }
                 if (ForceLinear.Checked)
+                {
                     saveFile.Filter = @"nav file (*.xin)|*.Linear.xin";
-                saveFile.SupportMultiDottedExtensions = true;
+                }
+                else
+                {
+                    saveFile.SupportMultiDottedExtensions = true;
+                }
             }
-            else saveFile.Filter = @"nav file (*.xin)|*.xin";
-            saveFile.InitialDirectory = Application.StartupPath + @"\nav";
-            saveFile.Title = @"Save your nav file";
-            switch (saveFile.ShowDialog())
+            else
             {
-                case DialogResult.OK:
-                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(saveFile.FileName))
+                saveFile.Filter = @"nav file (*.xin)|*.xin";
+            }
+
+            if (saveFile.ShowDialog() == DialogResult.OK)
+            {
+                using (var file = new StreamWriter(saveFile.FileName))
+                {
+                    foreach (string waypoint in WayPoints.Items)
                     {
-                        foreach (string waypoint in WayPoints.Items)
-                        {
-                            file.WriteLine(waypoint);
-                        }
+                        file.WriteLine(waypoint);
                     }
-                    break;
+                }
             }
         }
         public void OpenNavi(string path)
@@ -258,12 +274,29 @@
         }
         private void comboBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (comboBox2.Text == "") return;
-            if (comboBox2.Text.Contains(".Linear.")) Linear.Checked = true;
-            else if (comboBox2.Text.Contains(".Circular.")) Circular.Checked = true;
-            var path = string.Format("{0}\\Nav\\", Application.StartupPath);
-            var navi = new FileInfo(path + comboBox2.Text);
+            if (comboBox2.Text == "")
+            {
+                return;
 
+            }
+
+            if (comboBox2.Text.Contains(".Linear."))
+            {
+                Linear.Checked = true;
+            }
+            else if (comboBox2.Text.Contains(".Circular."))
+            {
+                Circular.Checked = true;
+            }
+
+            var navPath = Path.Combine(Application.StartupPath, "\\nav");
+            if (!Directory.Exists(navPath))
+            {
+                Directory.CreateDirectory(navPath);
+            }
+
+            var naviPath = Path.Combine(navPath, comboBox2.Text);
+            var navi = new FileInfo(naviPath);
             if (navi.Exists)
             {
                 OpenNavi(navi.ToString());
@@ -272,8 +305,13 @@
         private void RefreshToolStripMenuItem_Click(object sender, EventArgs e)
         {
             comboBox2.Items.Clear();
-            var path = string.Format("{0}\\Nav\\", Application.StartupPath);
-            foreach (var file in Directory.GetFiles(path, "*.xin"))
+            var navPath = Path.Combine(Application.StartupPath, "\\nav");
+            if (!Directory.Exists(navPath))
+            {
+                Directory.CreateDirectory(navPath);
+            }
+
+            foreach (var file in Directory.GetFiles(navPath, "*.xin"))
             {
                 if (!comboBox2.Items.Contains(new FileInfo(file).Name)) comboBox2.Items.Add(new FileInfo(file).Name);
             }

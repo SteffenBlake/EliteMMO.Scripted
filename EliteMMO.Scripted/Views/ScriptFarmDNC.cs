@@ -349,6 +349,7 @@
             isMoving = false;
         }
         #endregion
+
         #region Thread - PET
         private void BgwScriptPetDoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
         {
@@ -479,6 +480,7 @@
             }
         }
         #endregion
+
         #region Thread - NAV
         private void BgwScriptNavDoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
         {
@@ -498,58 +500,27 @@
                    (!PlayerInfo.HasBuff(10) || !PlayerInfo.HasBuff(11) || !PlayerInfo.HasBuff(0)))
                 {
                     if (checkZone.Checked && startzone != api.Player.ZoneId) ToolStopClick(null, null);
-                    var closestWayPoint = FindClosestWayPoint();
-                    if (runReverse.Checked)
-                    {
-                        closestWayPoint--;
-                        if (closestWayPoint < 0)
-                        {
-                            if (Linear.Checked)
-                            {
-                                closestWayPoint = 1;
-                                runReverse.Checked = false;
-                            }
-                            else
-                            {
-                                closestWayPoint = (navPathX.Count() - 1);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        closestWayPoint++;
-                        if (closestWayPoint >= navPathX.Count())
-                        {
-                            if (Linear.Checked)
-                            {
-                                closestWayPoint -= 2;
-                                runReverse.Checked = true;
-                            }
-                            else
-                            {
-                                closestWayPoint = 0;
-                            }
-                        }
-                    }
-                    if (firstPersonView.Checked || navPathfirst[closestWayPoint])
+                    var nextWaypoint = FindNextWaypoint();
+
+                    if (firstPersonView.Checked || navPathfirst[nextWaypoint])
                     {
                         if (api.Player.ViewMode != 1)
                             api.Player.ViewMode = 1;
                         api.AutoFollow.IsAutoFollowing = false;
                         api.Entity.GetLocalPlayer().H = (float)((Math.PI / 180) *
-                            (PlayerInfo.GetAngleFrom(navPathX[closestWayPoint], navPathZ[closestWayPoint]) - 180));
+                            (PlayerInfo.GetAngleFrom(navPathX[nextWaypoint], navPathZ[nextWaypoint]) - 180));
                     }
                     else if (api.Player.ViewMode == 1)
                         api.Player.ViewMode = 0;
 
-                    api.AutoFollow.SetAutoFollowCoords((float)navPathX[closestWayPoint] - PlayerInfo.X,
-                      ((navPathY[closestWayPoint] == 0) ? 0 : (float)navPathY[closestWayPoint] - PlayerInfo.Y),
-                      (float)navPathZ[closestWayPoint] - PlayerInfo.Z);
+                    api.AutoFollow.SetAutoFollowCoords((float)navPathX[nextWaypoint] - PlayerInfo.X,
+                      navPathY[nextWaypoint] == 0 ? 0 : (float)navPathY[nextWaypoint] - PlayerInfo.Y,
+                      (float)navPathZ[nextWaypoint] - PlayerInfo.Z);
 
-                    if (navPathpause[closestWayPoint].Contains("Pause"))
+                    if (navPathpause[nextWaypoint].Contains("Pause"))
                     {
                         api.AutoFollow.IsAutoFollowing = false;
-                        var items = navPathpause[closestWayPoint].Split(';');
+                        var items = navPathpause[nextWaypoint].Split(';');
                         Thread.Sleep(TimeSpan.FromSeconds(double.Parse(items[1])));
                     }
                     //if (navPathpause[closestWayPoint] > 0 && !paused)
@@ -570,9 +541,9 @@
                     //    continue;
                     //}
 
-                    if (navPathdoor[closestWayPoint].Contains("Door"))
+                    if (navPathdoor[nextWaypoint].Contains("Door"))
                     {
-                        CheckDoor(closestWayPoint);
+                        CheckDoor(nextWaypoint);
                     }
                     //if (navPathdoor[closestWayPoint] > 0)
                     //{
@@ -606,6 +577,89 @@
                 WindowInfo.KeyUp(API.Keys.NUMPAD8);
             }
         }
+
+
+        private int FindNextWaypoint()
+        {
+            var closest = FindClosestWayPoint();
+            // Quick shortcuts for the linear end points to simplify things
+            if (closest == 0 && !runReverse.Checked && Linear.Checked)
+            {
+                runReverse.Checked = true;
+                // Closest waypoint is the first, therefore second WP is next
+                return 1;
+            }
+            if (closest == navPathX.Length && runReverse.Checked && Linear.Checked)
+            {
+                // Closest WP is the last, and we're going backwards, therefor second last is next!
+                runReverse.Checked = false;
+                return navPathX.Length - 2;
+            }
+
+            // Ok we are somewhere in the middle, so whats the next WP?
+            var next = runReverse.Checked ? closest - 1 : closest + 1;
+
+            // Logically these two ifs below only occur if we aren't set to linear, which means we are on circular.
+            // Otherwise somehow the two short circuits above somehow failed.
+            if (closest == -1)
+                closest = navPathX.Length - 1;
+
+            if (closest >= navPathX.Length)
+                closest = 0;
+
+            // Calculate distance to next Waypoint, and distance between Closest<=>Next
+            var nextDist = WaypointDistance(next);
+            var dDist = Distance(navPathX[closest], navPathX[next], navPathZ[closest], navPathZ[next], navPathY[closest], navPathY[next]);
+
+            if (dDist > nextDist)
+            {
+                // Closest Waypoint is also the next waypoint in correct direction
+                return closest;
+            }
+            else
+            {
+                // Closest Waypoint is going the wrong direction, so Next waypoint after it is correct
+                return next;
+            }
+
+        }
+
+        private int FindClosestWayPoint()
+        {
+            var maxRange = 50.0;
+            var outRange = -1;
+            for (int i = 0; i < navPathX.Length; i++)
+            {
+                var dist = WaypointDistance(i);
+                if (dist < maxRange)
+                {
+                    maxRange = dist;
+                    outRange = i;
+                }
+            }
+
+            return outRange;
+        }
+
+        private double WaypointDistance(int waypointIndex)
+        {
+            if (waypointIndex < 0)
+                throw new ArgumentOutOfRangeException(nameof(waypointIndex));
+            if (waypointIndex >= navPathX.Length)
+                throw new ArgumentOutOfRangeException(nameof(waypointIndex));
+
+            return Distance(PlayerInfo.X, navPathX[waypointIndex], PlayerInfo.Z, navPathZ[waypointIndex], PlayerInfo.Y, navPathY[waypointIndex]);
+        }
+
+        private double Distance(double x1, double x2, double z1, double z2, double y1, double y2)
+        {
+            var dx = x1 - x2;
+            var dy = y1 - y2;
+            var dz = z1 - z2;
+
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
         #endregion
         #region Thread - SCH Charges
         private void BgwScriptSCHChargesDoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
