@@ -1,0 +1,6 @@
+.vs
+*.cache
+[B|b]in
+/EliteMMO.Scripted/EliteAPI.dll
+*EliteMMO.API.dll
+obj
